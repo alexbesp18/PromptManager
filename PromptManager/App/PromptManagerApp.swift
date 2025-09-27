@@ -13,6 +13,21 @@ class SafePromptViewModel: ObservableObject {
         // Don't load data in initializer - do it after view appears
     }
 
+    func addPrompt(title: String, content: String) {
+        let newPrompt = SafePrompt(title: title, content: content)
+        prompts.append(newPrompt)
+        selectedPrompt = newPrompt
+        print("✅ Added new prompt: \(title)")
+    }
+
+    func deletePrompt(_ prompt: SafePrompt) {
+        prompts.removeAll { $0.id == prompt.id }
+        if selectedPrompt?.id == prompt.id {
+            selectedPrompt = prompts.first
+        }
+        print("✅ Deleted prompt: \(prompt.title)")
+    }
+
     func loadSampleData() {
         // Simple in-memory data - Core Data entities are corrupted, so avoiding them
         prompts = [
@@ -35,14 +50,23 @@ struct SafePrompt: Identifiable, Hashable {
 
 struct CoreDataContentView: View {
     @StateObject private var viewModel = SafePromptViewModel()
+    @State private var showingNewPrompt = false
 
     var body: some View {
         HStack {
             // Sidebar
             VStack(alignment: .leading) {
-                Text("PromptManager (Core Data)")
-                    .font(.headline)
-                    .padding()
+                HStack {
+                    Text("PromptManager")
+                        .font(.headline)
+                    Spacer()
+                    Button(action: { showingNewPrompt = true }) {
+                        Image(systemName: "plus")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Add New Prompt")
+                }
+                .padding()
 
                 List(viewModel.prompts, id: \.id, selection: $viewModel.selectedPrompt) { prompt in
                     VStack(alignment: .leading) {
@@ -55,6 +79,11 @@ struct CoreDataContentView: View {
                     }
                     .padding(.vertical, 4)
                     .tag(prompt)
+                    .contextMenu {
+                        Button("Delete") {
+                            viewModel.deletePrompt(prompt)
+                        }
+                    }
                 }
                 .listStyle(SidebarListStyle())
             }
@@ -114,6 +143,60 @@ struct CoreDataContentView: View {
             print("Loading sample data...")
             viewModel.loadSampleData()
         }
+        .sheet(isPresented: $showingNewPrompt) {
+            NewPromptView(viewModel: viewModel, isPresented: $showingNewPrompt)
+        }
+    }
+}
+
+struct NewPromptView: View {
+    @ObservedObject var viewModel: SafePromptViewModel
+    @Binding var isPresented: Bool
+    @State private var title = ""
+    @State private var content = ""
+
+    var body: some View {
+        NavigationView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Title")
+                        .font(.headline)
+                    TextField("Enter prompt title", text: $title)
+                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Content")
+                        .font(.headline)
+                    TextEditor(text: $content)
+                        .font(.body)
+                        .frame(minHeight: 200)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.secondary.opacity(0.3), lineWidth: 1)
+                        )
+                }
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("New Prompt")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        isPresented = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        viewModel.addPrompt(title: title, content: content)
+                        isPresented = false
+                    }
+                    .disabled(title.isEmpty || content.isEmpty)
+                }
+            }
+        }
+        .frame(minWidth: 500, minHeight: 400)
     }
 }
 
@@ -125,6 +208,11 @@ struct PromptManagerApp: App {
         }
         .commands {
             CommandGroup(after: .newItem) {
+                Button("New Prompt") {
+                    // Trigger new prompt creation
+                }
+                .keyboardShortcut("n", modifiers: [.command])
+
                 Button("Copy Selected Prompt") {
                     // This would copy the selected prompt
                 }
