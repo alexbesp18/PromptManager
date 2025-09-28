@@ -8,15 +8,20 @@ class SafePromptViewModel: ObservableObject {
     @Published var selectedPrompt: SafePrompt?
 
     private let coreDataStack = SafeCoreDataStack.shared
+    private let saveURL: URL
 
     init() {
-        // Don't load data in initializer - do it after view appears
+        // Set up save location in Documents folder
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        self.saveURL = documentsPath.appendingPathComponent("PromptManager").appendingPathExtension("json")
+        print("📂 Save location: \(saveURL.path)")
     }
 
     func addPrompt(title: String, content: String) {
         let newPrompt = SafePrompt(title: title, content: content)
         prompts.append(newPrompt)
         selectedPrompt = newPrompt
+        savePrompts()
         print("✅ Added new prompt: \(title)")
     }
 
@@ -25,7 +30,31 @@ class SafePromptViewModel: ObservableObject {
         if selectedPrompt?.id == prompt.id {
             selectedPrompt = prompts.first
         }
+        savePrompts()
         print("✅ Deleted prompt: \(prompt.title)")
+    }
+
+    private func savePrompts() {
+        do {
+            let data = try JSONEncoder().encode(prompts)
+            try data.write(to: saveURL)
+            print("💾 Saved \(prompts.count) prompts to: \(saveURL.path)")
+        } catch {
+            print("❌ Failed to save prompts to \(saveURL.path): \(error)")
+        }
+    }
+
+    func loadPrompts() {
+        print("🔍 Attempting to load prompts from: \(saveURL.path)")
+        do {
+            let data = try Data(contentsOf: saveURL)
+            prompts = try JSONDecoder().decode([SafePrompt].self, from: data)
+            print("📂 Successfully loaded \(prompts.count) prompts from disk")
+        } catch {
+            print("📂 No saved prompts found (\(error.localizedDescription)), loading sample data")
+            loadSampleData()
+            savePrompts()
+        }
     }
 
     func loadSampleData() {
@@ -42,10 +71,20 @@ class SafePromptViewModel: ObservableObject {
     }
 }
 
-struct SafePrompt: Identifiable, Hashable {
-    let id = UUID()
+struct SafePrompt: Identifiable, Hashable, Codable {
+    let id: UUID
     let title: String
     let content: String
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(title: String, content: String) {
+        self.id = UUID()
+        self.title = title
+        self.content = content
+        self.createdAt = Date()
+        self.updatedAt = Date()
+    }
 }
 
 struct CoreDataContentView: View {
@@ -129,8 +168,8 @@ struct CoreDataContentView: View {
                             Text("✅ App running successfully!")
                                 .foregroundColor(.green)
                                 .font(.caption)
-                            Text("(Using in-memory storage)")
-                                .foregroundColor(.orange)
+                            Text("(Using persistent JSON storage)")
+                                .foregroundColor(.green)
                                 .font(.caption2)
                         }
                     }
@@ -140,8 +179,8 @@ struct CoreDataContentView: View {
         }
         .frame(minWidth: 700, minHeight: 500)
         .onAppear {
-            print("Loading sample data...")
-            viewModel.loadSampleData()
+            print("Loading prompts from disk...")
+            viewModel.loadPrompts()
         }
         .sheet(isPresented: $showingNewPrompt) {
             NewPromptView(viewModel: viewModel, isPresented: $showingNewPrompt)

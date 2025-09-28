@@ -1,0 +1,33 @@
+# Xcode
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Temporary files
+*.swp
+*.tmp
+*~
+
+# Build artifacts
+build/
+Build/
+
+# Debug files
+*.log
+
+# Test files (keep for now but may exclude later)
+TestWindow.swift
+SimplePromptApp.swift
+CoreDataVersion.swift
+verification_test.swift
